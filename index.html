@@ -413,7 +413,7 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
         <li><b>Play, Pause, Stop</b> und <b>Wiederholen</b> steuern die Begleitung. Über die Zeitleiste springst du an jede Stelle.</li>
         <li><b>Tempo</b>: Mit − und + oder dem Regler zwischen 50 und 150 %. Ein Tipp auf die Anzeige stellt das Original wieder her.</li>
         <li><b>Klaviatur</b>: Tasten antippen spielt den Ton. Der Balken zeigt die Lage der Übung, beim Abspielen leuchtet die Note, die du gerade singen sollst.</li>
-        <li><b>Noten-Knopf ♫</b> (oben neben dem Fragezeichen): zeigt statt der Klaviatur die Noten des aktuellen Durchgangs im Violin- oder Bassschlüssel. Die graue Note ist der Startton. Beim Abspielen leuchtet die Note, die du singen sollst. Eine Note antippen spielt sie. Mit eingeschaltetem Mikrofon erscheint deine gesungene Note halbtransparent an der Stelle der gerade gespielten Note und mit derselben Notenlänge, ohne Wiedergabe bei der ersten Note. Triffst du nicht genau, liegt sie zwischen den Linien. Grün heißt: höchstens 20 Cent neben der Sollnote, rot: weiter daneben. Die Zahl oben ist die Abweichung zur Sollnote in Cent. Ein erneuter Tipp auf den Knopf holt die Klaviatur zurück.</li>
+        <li><b>Noten-Knopf ♫</b> (oben neben dem Fragezeichen): zeigt statt der Klaviatur die Noten des aktuellen Durchgangs im Violin- oder Bassschlüssel. Die graue Note ist der Startton. Beim Abspielen leuchtet die Note, die du singen sollst. Eine Note antippen spielt sie. Mit eingeschaltetem Mikrofon erscheint deine gesungene Note halbtransparent an der Stelle der gerade gespielten Note und mit derselben Notenlänge, ohne Wiedergabe von vorne beim Startton von Durchgang 1. Triffst du nicht genau, liegt sie zwischen den Linien. Grün heißt: höchstens 20 Cent neben der Sollnote, rot: weiter daneben. Die Zahl oben ist die Abweichung zur Sollnote in Cent. Ein erneuter Tipp auf den Knopf holt die Klaviatur zurück.</li>
         <li><b>Mikrofon</b> (Knopf oben in der Mitte): zeigt beim Singen deine Tonhöhe als roten Punkt im oberen Bereich der Klaviatur und groß im Feld neben den Wiedergabetasten, mit der Abweichung in Cent. Ein grüner Rand heißt: höchstens 20 Cent daneben. Am besten mit Kopfhörern.</li>
         <li><b>Titel „Tonleiterlift“</b>: zeigt einen QR-Code, um die App auf einem anderen Gerät zu öffnen.</li>
         <li><b>Logo</b> oder der Link ganz unten: Impressum und Datenschutz.</li>
@@ -911,7 +911,7 @@ function renderStaff() {
 }
 function staffSync(t, playing) {
   if (!staffOn || !events.length) return;
-  const k = passAt(t);
+  const k = (playing || lastSungF == null) ? passAt(t) : 0;
   if (k !== staffPass) { staffPass = k; renderStaff(); }
   let idx = -1;
   if (playing) {
@@ -932,6 +932,8 @@ function staffSync(t, playing) {
 }
 function staffSung(midiF) {
   lastSungF = midiF;
+  // Ohne Wiedergabe: von vorne, also Durchgang 1 mit dem Startton
+  if (midiF != null && audio.paused && staffOn && staffPasses.length && staffPass !== 0) { staffPass = 0; renderStaff(); }
   const g = document.getElementById("sungStaff");
   if (!g || !staffGeo) return;
   if (midiF == null || !staffGeo.notes.length) { g.style.display = "none"; return; }
