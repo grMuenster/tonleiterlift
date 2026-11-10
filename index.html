@@ -343,6 +343,14 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .staff .sdot { fill: #D7263D; stroke: #FFFFFF; stroke-width: 1.2; }
 .staff .sdot.ok { stroke: var(--f1); stroke-width: 2.2; }
 .staff .sline { stroke: #D7263D; stroke-width: 0.8; stroke-dasharray: 2 2; }
+.staff .ghost { color: #D7263D; pointer-events: none; }
+.staff .ghost #sungNote { opacity: .55; }
+.staff .ghost.ok { color: var(--f1); }
+.staff .ghost .ink { fill: currentColor; }
+.staff .ghost .hollow { fill: none; stroke: currentColor; stroke-width: 1.5; }
+.staff .ghost .stem { stroke: currentColor; stroke-width: 1.2; fill: none; }
+.staff .ghost .ledger { stroke: currentColor; stroke-width: 1.1; }
+.staff .ghost .stxt { fill: currentColor; }
 .staff .stxt { font: 600 6.5px var(--mono); fill: #D7263D; }
 .wrap.measuring .staff { height: 96px; flex: none; }
 @media (max-width: 760px) {
@@ -405,7 +413,7 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
         <li><b>Play, Pause, Stop</b> und <b>Wiederholen</b> steuern die Begleitung. Über die Zeitleiste springst du an jede Stelle.</li>
         <li><b>Tempo</b>: Mit − und + oder dem Regler zwischen 50 und 150 %. Ein Tipp auf die Anzeige stellt das Original wieder her.</li>
         <li><b>Klaviatur</b>: Tasten antippen spielt den Ton. Der Balken zeigt die Lage der Übung, beim Abspielen leuchtet die Note, die du gerade singen sollst.</li>
-        <li><b>Noten-Knopf ♫</b> (oben neben dem Fragezeichen): zeigt statt der Klaviatur die Noten des aktuellen Durchgangs im Violin- oder Bassschlüssel. Die graue Note ist der Startton. Beim Abspielen leuchtet die Note, die du singen sollst. Eine Note antippen spielt sie. Mit eingeschaltetem Mikrofon zeigt ein roter Punkt deine Tonhöhe, auch zwischen den Linien, wenn du nicht genau triffst. Ein erneuter Tipp auf den Knopf holt die Klaviatur zurück.</li>
+        <li><b>Noten-Knopf ♫</b> (oben neben dem Fragezeichen): zeigt statt der Klaviatur die Noten des aktuellen Durchgangs im Violin- oder Bassschlüssel. Die graue Note ist der Startton. Beim Abspielen leuchtet die Note, die du singen sollst. Eine Note antippen spielt sie. Mit eingeschaltetem Mikrofon erscheint deine gesungene Note halbtransparent an der Stelle der gerade gespielten Note und mit derselben Notenlänge, ohne Wiedergabe bei der ersten Note. Triffst du nicht genau, liegt sie zwischen den Linien. Grün heißt: höchstens 20 Cent neben der Sollnote, rot: weiter daneben. Die Zahl oben ist die Abweichung zur Sollnote in Cent. Ein erneuter Tipp auf den Knopf holt die Klaviatur zurück.</li>
         <li><b>Mikrofon</b> (Knopf oben in der Mitte): zeigt beim Singen deine Tonhöhe als roten Punkt im oberen Bereich der Klaviatur und groß im Feld neben den Wiedergabetasten, mit der Abweichung in Cent. Ein grüner Rand heißt: höchstens 20 Cent daneben. Am besten mit Kopfhörern.</li>
         <li><b>Titel „Tonleiterlift“</b>: zeigt einen QR-Code, um die App auf einem anderen Gerät zu öffnen.</li>
         <li><b>Logo</b> oder der Link ganz unten: Impressum und Datenschutz.</li>
@@ -766,7 +774,7 @@ const GLYPH = { treble: { d: "M434 2Q464 -103 464 -170Q464 -223 427.0 -257.0Q390
 const SP = 10;                       // Linienabstand in SVG-Einheiten
 const FLAT_NAMES = ["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B","H"];
 const nameOf = (m, flats) => `${(flats ? FLAT_NAMES : NAMES)[((m % 12) + 12) % 12]}${Math.floor(m / 12) - 1}`;
-let staffOn = false, staffPasses = [], staffPass = -1, staffNotes = [], staffCurIdx = -1, staffGeo = null;
+let staffOn = false, staffPasses = [], staffPass = -1, staffNotes = [], staffCurIdx = -1, staffLastIdx = -1, staffGeo = null, lastSungF = null;
 const FLAT_KEYS = [1, 3, 5, 8, 10];  // Des, Es, F, As, B: mit b notieren
 const SHARP_SP = [[0,0],[0,1],[1,0],[1,1],[2,0],[3,0],[3,1],[4,0],[4,1],[5,0],[5,1],[6,0]];
 const FLAT_SP  = [[0,0],[1,-1],[1,0],[2,-1],[2,0],[3,0],[4,-1],[4,0],[5,-1],[5,0],[6,-1],[6,0]];
@@ -890,13 +898,13 @@ function renderStaff() {
   });
   if (notes.length) parts.push(`<text class="cuet" x="${notes[0].x}" y="${bot - 2}" text-anchor="middle">Start</text>`);
   // Marker für die gesungene Tonhöhe
-  parts.push(`<g id="sungStaff" style="display:none"><line class="sline" id="sungLine" x1="0" x2="0" y1="0" y2="0"/><circle class="sdot" id="sungC" r="4.6"/><text class="stxt" id="sungT" text-anchor="middle"></text></g>`);
+  parts.push(`<g id="sungStaff" class="ghost" style="display:none"><g id="sungNote"></g><text class="stxt" id="sungT" text-anchor="middle"></text></g>`);
   svg.setAttribute("viewBox", `0 ${top} ${W} ${bot - top}`);
   svg.style.height = `${(bot - top) * scale}px`;
   svg.style.width = `${W * scale}px`;
   svg.innerHTML = parts.join("");
-  staffNotes = notes; staffCurIdx = -1;
-  staffGeo = { y, clef, flats, top, bot, sungX, scale, notes, W };
+  staffNotes = notes; staffCurIdx = -1; staffLastIdx = -1;
+  staffGeo = { y, clef, flats, top, bot, sungX, scale, notes, W, midP };
   const dg = staffPasses.length > 1 ? `Durchgang ${staffPass + 1}/${staffPasses.length}` : "";
   $("staffLbl").textContent = dg;
   if ($("pianoHint")) $("pianoHint").textContent = "Note antippen, graue Note = Startton" + (dg ? " · " + dg : "");
@@ -914,6 +922,8 @@ function staffSync(t, playing) {
   const svg = $("staffSvg");
   svg.querySelectorAll(".sn.cur").forEach(el => el.classList.remove("cur"));
   staffCurIdx = idx;
+  if (idx >= 0) staffLastIdx = idx;
+  if (lastSungF != null) staffSung(lastSungF);
   if (idx >= 0) {
     const el = svg.querySelector(`.sn[data-i="${idx}"]`); if (el) el.classList.add("cur");
     const sc = $("staffScroll"), px = staffNotes[idx].x * staffGeo.scale;
@@ -921,23 +931,47 @@ function staffSync(t, playing) {
   }
 }
 function staffSung(midiF) {
+  lastSungF = midiF;
   const g = document.getElementById("sungStaff");
   if (!g || !staffGeo) return;
-  if (midiF == null) { g.style.display = "none"; return; }
-  const { y, clef, flats, top, bot, sungX, notes } = staffGeo;
+  if (midiF == null || !staffGeo.notes.length) { g.style.display = "none"; return; }
+  const { y, clef, flats, top, bot, notes, midP } = staffGeo;
+  // Stelle: die gerade gespielte Note; in Atempausen die zuletzt gespielte; sonst die erste Note
+  const idx = staffCurIdx >= 0 ? staffCurIdx : (!audio.paused && staffLastIdx >= 0 ? staffLastIdx : 0);
+  const n = notes[Math.min(idx, notes.length - 1)], x = n.x, val = n.val;
+  // Höhe stufenlos: zwischen den Linien, wenn der Ton nicht genau getroffen ist
   const lo = Math.floor(midiF), f = midiF - lo;
   const y0 = y(spell(lo + clef.shift, flats).p), y1 = y(spell(lo + 1 + clef.shift, flats).p);
-  let yy = y0 + (y1 - y0) * f;
-  const clamped = Math.max(top + 5, Math.min(bot - 5, yy));
-  const x = staffCurIdx >= 0 ? notes[staffCurIdx].x + 11 : sungX;
+  const yy = Math.max(top + 5, Math.min(bot - 5, y0 + (y1 - y0) * f));
   const m = Math.round(midiF), cents = Math.round((midiF - m) * 100);
-  const c = document.getElementById("sungC"), t = document.getElementById("sungT"), l = document.getElementById("sungLine");
-  c.setAttribute("cx", x); c.setAttribute("cy", clamped);
-  c.classList.toggle("ok", Math.abs(cents) <= 20);
-  // Hilfslinie vom Punkt zur Mitte des nächsten Notenkopfs, wenn eine Note gerade klingt
-  if (staffCurIdx >= 0) { const ny = y(notes[staffCurIdx].p); l.setAttribute("x1", x); l.setAttribute("x2", x); l.setAttribute("y1", clamped); l.setAttribute("y2", ny); l.style.display = ""; } else l.style.display = "none";
-  const nearEnd = x > staffGeo.W - 22; t.setAttribute("text-anchor", nearEnd ? "end" : "middle"); t.setAttribute("x", nearEnd ? staffGeo.W - 1 : x); t.setAttribute("y", top + 7);
-  t.textContent = `${nameOf(m, flats)} ${cents > 0 ? "+" : ""}${cents}`;
+  const sp = spell(m + clef.shift, flats), parts = [];
+  for (let q = clef.bot - 2; q >= sp.p; q -= 2) parts.push(`<line class="ledger" x1="${x - 8}" x2="${x + 8}" y1="${y(q)}" y2="${y(q)}"/>`);
+  for (let q = clef.top + 2; q <= sp.p; q += 2) parts.push(`<line class="ledger" x1="${x - 8}" x2="${x + 8}" y1="${y(q)}" y2="${y(q)}"/>`);
+  if (sp.acc) {
+    const A = GLYPH[sp.acc > 0 ? "sharp" : "flat"], ab = A.b, k = (sp.acc > 0 ? SP * 2.6 : SP * 2.1) / (ab[3] - ab[1]);
+    const ty = sp.acc > 0 ? yy + ((ab[3] + ab[1]) / 2) * k : yy + 130 * k;
+    parts.push(`<path class="ink" stroke-width="0" transform="translate(${x - 15 - ab[0] * k} ${ty}) scale(${k} ${-k})" d="${A.d}"/>`);
+  }
+  if (val.head === "black") parts.push(`<ellipse class="ink" stroke-width="0" cx="${x}" cy="${yy}" rx="5.9" ry="4.3" transform="rotate(-20 ${x} ${yy})"/>`);
+  else if (val.head === "half") parts.push(`<ellipse class="hollow" cx="${x}" cy="${yy}" rx="5.4" ry="3.8" transform="rotate(-20 ${x} ${yy})"/>`);
+  else parts.push(`<ellipse class="hollow" style="stroke-width:2.2" cx="${x}" cy="${yy}" rx="6.2" ry="4.2"/>`);
+  if (val.stem) {
+    const up = yy > y(midP);
+    const sx = up ? x + 5.4 : x - 5.4, ey = up ? Math.min(yy - 34, y(midP)) : Math.max(yy + 34, y(midP));
+    parts.push(`<line class="stem" x1="${sx}" x2="${sx}" y1="${yy + (up ? -1 : 1)}" y2="${ey}"/>`);
+    if (val.flag) parts.push(up
+      ? `<path class="ink" stroke-width="0" d="M${sx} ${ey} c0.6 6 9 8 7 18 c3 -10 -3 -14 -7 -15 z"/>`
+      : `<path class="ink" stroke-width="0" d="M${sx} ${ey} c0.6 -6 9 -8 7 -18 c3 10 -3 14 -7 15 z"/>`);
+  }
+  if (val.dots) parts.push(`<circle class="ink" stroke-width="0" cx="${x + 10}" cy="${yy - 2.5}" r="1.6"/>`);
+  document.getElementById("sungNote").innerHTML = parts.join("");
+  const dev = Math.round((midiF - n.m) * 100);            // Abweichung zur Sollnote in Cent
+  g.classList.toggle("ok", Math.abs(dev) <= 20);
+  const t = document.getElementById("sungT");
+  const nearEnd = x > staffGeo.W - 22, nearStart = x < 22;
+  t.setAttribute("text-anchor", nearEnd ? "end" : nearStart ? "start" : "middle");
+  t.setAttribute("x", nearEnd ? staffGeo.W - 1 : nearStart ? 1 : x); t.setAttribute("y", top + 7);
+  t.textContent = `${nameOf(m, flats)} ${dev > 0 ? "+" : ""}${dev}`;
   g.style.display = "";
 }
 function setView(on, quiet) {
